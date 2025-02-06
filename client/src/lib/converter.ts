@@ -118,9 +118,17 @@ export async function convertConfig(input: string, portConfig: PortConfig = { po
         continue;
       }
 
-      // Pass through port set commands without changes
-      if (trimmedLine.startsWith('port set')) {
-        converted.push(trimmedLine);
+      // Handle port set commands with port mapping
+      if (trimmedLine.startsWith('port set port')) {
+        let newLine = trimmedLine;
+        for (const mapping of portConfig.portMappings) {
+          // Update the port number after "port set port"
+          newLine = newLine.replace(
+            `port set port ${mapping.oldPort}`,
+            `port set port ${mapping.newPort}`
+          );
+        }
+        converted.push(newLine);
         continue;
       }
 
