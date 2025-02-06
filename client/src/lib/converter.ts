@@ -102,14 +102,19 @@ function convertVlanAddCommand(line: string, portConfig: PortConfig): string[] {
   return convertedLines;
 }
 
-function convertInterfaceCommand(line: string): string[] {
+function convertInterfaceCommand(line: string, removedVlans: Set<number>): string[] {
   const parts = line.split(' ');
   const interfaceNameIdx = parts.indexOf('ip-interface') + 1;
   const interfaceName = parts[interfaceNameIdx];
   const ipIdx = parts.indexOf('ip') + 1;
   const ipAddr = parts[ipIdx];
   const vlanIdx = parts.indexOf('vlan') + 1;
-  const vlanNum = parts[vlanIdx];
+  const vlanNum = parseInt(parts[vlanIdx]);
+
+  // Skip if this VLAN was removed due to port removal
+  if (removedVlans.has(vlanNum)) {
+    return [];
+  }
 
   return [
     `cpu-interface sub-interface create cpu-subinterface cpu-mpls-.${vlanNum} cpu-egress-l2-transform push-8100.${vlanNum}.7`,
@@ -127,6 +132,7 @@ export async function convertConfig(input: string, portConfig: PortConfig = { po
 
     // Track which VLANs are associated with which ports
     const vlanPortMap = new Map<number, Set<string>>();
+    const removedVlans = new Set<number>();
 
     // First pass: build VLAN to port associations
     for (const line of lines) {
@@ -143,6 +149,13 @@ export async function convertConfig(input: string, portConfig: PortConfig = { po
           }
           vlanPortMap.get(vlan)!.add(port);
         });
+      }
+    }
+
+    // Identify VLANs that should be removed
+    for (const [vlan, ports] of vlanPortMap.entries()) {
+      if (Array.from(ports).every(port => isPortRemoved(port, portConfig.removedPorts))) {
+        removedVlans.add(vlan);
       }
     }
 
@@ -181,10 +194,7 @@ export async function convertConfig(input: string, portConfig: PortConfig = { po
         originalVlanCount += vlanNumbers.length;
 
         vlanNumbers.forEach(vlan => {
-          const vlanPorts = vlanPortMap.get(vlan) || new Set();
-          const hasNonRemovedPorts = Array.from(vlanPorts).some(port => !isPortRemoved(port, portConfig.removedPorts));
-
-          if (hasNonRemovedPorts || !vlanPorts.size) {
+          if (!removedVlans.has(vlan)) {
             converted.push(`virtual-switch create vs VLAN_${vlan}-VS`);
             virtualSwitchCount++;
           }
@@ -194,15 +204,13 @@ export async function convertConfig(input: string, portConfig: PortConfig = { po
       } else if (trimmedLine.startsWith('vlan rename vlan')) {
         const parts = trimmedLine.split(' ');
         const vlanNum = parseInt(parts[3]);
-        const vlanPorts = vlanPortMap.get(vlanNum) || new Set();
-        const hasNonRemovedPorts = Array.from(vlanPorts).some(port => !isPortRemoved(port, portConfig.removedPorts));
 
-        if (hasNonRemovedPorts) {
+        if (!removedVlans.has(vlanNum)) {
           const name = parts.slice(5).join('_');
           converted.push(`virtual-switch set vs VLAN_${vlanNum}-VS description "${name}"`);
         }
       } else if (trimmedLine.startsWith('interface create ip-interface')) {
-        converted.push(...convertInterfaceCommand(trimmedLine));
+        converted.push(...convertInterfaceCommand(trimmedLine, removedVlans));
       } else if (trimmedLine.startsWith('system hostname')) {
         converted.push(trimmedLine.replace('system hostname', 'hostname'));
       } else if (trimmedLine.startsWith('interface ethernet')) {
