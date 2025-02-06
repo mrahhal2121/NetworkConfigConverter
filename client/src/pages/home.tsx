@@ -190,41 +190,69 @@ export default function Home() {
       </Card>
 
       <Dialog open={showPortDialog} onOpenChange={setShowPortDialog}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Port Configuration</DialogTitle>
+            <DialogTitle>Configure Port Changes</DialogTitle>
             <DialogDescription>
-              Specify any port changes or removals before conversion
+              Before converting your configuration, you can specify port changes and removals. This will ensure the converted configuration uses the correct port numbers.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-6 py-4">
             <div className="space-y-4">
-              <h4 className="font-medium">Port Changes</h4>
+              <div className="space-y-2">
+                <h4 className="font-medium">Port Mappings</h4>
+                <p className="text-sm text-muted-foreground">
+                  Map old port numbers to new ones. For example, if port "1.1" should become "2.1" in the new configuration.
+                </p>
+              </div>
               {portMappings.map((mapping, index) => (
-                <div key={index} className="flex gap-2">
-                  <Input
-                    placeholder="Old Port"
-                    value={mapping.oldPort}
-                    onChange={(e) => handlePortMappingChange(index, "oldPort", e.target.value)}
-                  />
-                  <span className="flex items-center">→</span>
-                  <Input
-                    placeholder="New Port"
-                    value={mapping.newPort}
-                    onChange={(e) => handlePortMappingChange(index, "newPort", e.target.value)}
-                  />
+                <div key={index} className="flex gap-2 items-center">
+                  <div className="grid gap-1.5 flex-1">
+                    <Input
+                      placeholder="Original port (e.g., 1.1)"
+                      value={mapping.oldPort}
+                      onChange={(e) => handlePortMappingChange(index, "oldPort", e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Old port number</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 mt-[-1.5rem]" />
+                  <div className="grid gap-1.5 flex-1">
+                    <Input
+                      placeholder="New port (e.g., 2.1)"
+                      value={mapping.newPort}
+                      onChange={(e) => handlePortMappingChange(index, "newPort", e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">New port number</p>
+                  </div>
                 </div>
               ))}
-              <Button type="button" variant="outline" onClick={handleAddPortMapping}>
-                Add Port Mapping
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAddPortMapping}
+                className="w-full"
+              >
+                Add Another Port Mapping
               </Button>
             </div>
-            <div className="space-y-2">
-              <h4 className="font-medium">Ports to Remove</h4>
-              <Textarea
-                placeholder="Enter ports to remove (comma-separated)"
-                onChange={handleRemovedPortChange}
-              />
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <h4 className="font-medium">Ports to Remove</h4>
+                <p className="text-sm text-muted-foreground">
+                  Specify ports that should be removed from the configuration. You can use ranges (e.g., "1.1-1.48" or "1-48") or list individual ports separated by commas.
+                </p>
+              </div>
+              <div className="grid gap-1.5">
+                <Textarea
+                  placeholder="Examples:&#13;&#10;1.1, 1.2, 1.3&#13;&#10;1.1-1.48&#13;&#10;1-48"
+                  onChange={handleRemovedPortChange}
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter each port or range on a new line, or separate with commas
+                </p>
+              </div>
             </div>
           </div>
           <DialogFooter>
