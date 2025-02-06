@@ -1,50 +1,33 @@
-import { configFiles, conversionRules, type Config, type InsertConfig, type Rule, type InsertRule } from "@shared/schema";
+import { type Conversion, type InsertConversion } from "@shared/schema";
 
 export interface IStorage {
-  saveConfig(config: InsertConfig): Promise<Config>;
-  getConfig(id: number): Promise<Config | undefined>;
-  getAllConfigs(): Promise<Config[]>;
-  addRule(rule: InsertRule): Promise<Rule>;
-  getAllRules(): Promise<Rule[]>;
+  saveConversion(conversion: InsertConversion): Promise<Conversion>;
+  getConversion(id: number): Promise<Conversion | undefined>;
+  listConversions(): Promise<Conversion[]>;
 }
 
 export class MemStorage implements IStorage {
-  private configs: Map<number, Config>;
-  private rules: Map<number, Rule>;
-  private configId: number;
-  private ruleId: number;
+  private conversions: Map<number, Conversion>;
+  private currentId: number;
 
   constructor() {
-    this.configs = new Map();
-    this.rules = new Map();
-    this.configId = 1;
-    this.ruleId = 1;
+    this.conversions = new Map();
+    this.currentId = 1;
   }
 
-  async saveConfig(insertConfig: InsertConfig): Promise<Config> {
-    const id = this.configId++;
-    const config: Config = { ...insertConfig, id };
-    this.configs.set(id, config);
-    return config;
+  async saveConversion(conversion: InsertConversion): Promise<Conversion> {
+    const id = this.currentId++;
+    const newConversion: Conversion = { ...conversion, id };
+    this.conversions.set(id, newConversion);
+    return newConversion;
   }
 
-  async getConfig(id: number): Promise<Config | undefined> {
-    return this.configs.get(id);
+  async getConversion(id: number): Promise<Conversion | undefined> {
+    return this.conversions.get(id);
   }
 
-  async getAllConfigs(): Promise<Config[]> {
-    return Array.from(this.configs.values());
-  }
-
-  async addRule(insertRule: InsertRule): Promise<Rule> {
-    const id = this.ruleId++;
-    const rule: Rule = { ...insertRule, id };
-    this.rules.set(id, rule);
-    return rule;
-  }
-
-  async getAllRules(): Promise<Rule[]> {
-    return Array.from(this.rules.values());
+  async listConversions(): Promise<Conversion[]> {
+    return Array.from(this.conversions.values());
   }
 }
 

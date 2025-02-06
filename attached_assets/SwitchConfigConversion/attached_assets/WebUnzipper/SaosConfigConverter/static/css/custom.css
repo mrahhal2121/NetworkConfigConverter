@@ -1,0 +1,25 @@
+/* Custom styles to complement Bootstrap */
+textarea {
+    font-family: monospace;
+    resize: vertical;
+    min-height: 300px;
+}
+
+.card {
+    height: 100%;
+}
+
+.loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+/* Animation for loading state */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading .bi-arrow-repeat {
+    animation: spin 1s linear infinite;
+}
