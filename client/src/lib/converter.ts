@@ -33,6 +33,45 @@ function parseVlanNumbers(vlanSpec: string): number[] {
   return Array.from(vlanNumbers).sort((a, b) => a - b);
 }
 
+function expandPortRange(portRange: string): string[] {
+  const ports: string[] = [];
+
+  // Handle single port
+  if (!portRange.includes('-')) {
+    return [portRange];
+  }
+
+  const [start, end] = portRange.split('-');
+
+  // Handle dot notation (e.g., "1.1-1.48")
+  if (start.includes('.')) {
+    const [prefix, startNum] = start.split('.');
+    const [_, endNum] = end.split('.');
+    const startInt = parseInt(startNum);
+    const endInt = parseInt(endNum);
+
+    for (let i = startInt; i <= endInt; i++) {
+      ports.push(`${prefix}.${i}`);
+    }
+  } 
+  // Handle simple notation (e.g., "1-48")
+  else {
+    const startInt = parseInt(start);
+    const endInt = parseInt(end);
+
+    for (let i = startInt; i <= endInt; i++) {
+      ports.push(i.toString());
+    }
+  }
+
+  return ports;
+}
+
+function isPortRemoved(port: string, removedPorts: string[]): boolean {
+  const expandedPorts = removedPorts.flatMap(range => expandPortRange(range));
+  return expandedPorts.includes(port);
+}
+
 function convertVlanAddCommand(line: string, portConfig: PortConfig): string[] {
   const parts = line.split(' ');
   const vlanStartIdx = 3;
@@ -40,7 +79,7 @@ function convertVlanAddCommand(line: string, portConfig: PortConfig): string[] {
   const originalPort = parts[parts.length - 1].trim();
 
   // Check if the port should be removed
-  if (portConfig.removedPorts.includes(originalPort)) {
+  if (isPortRemoved(originalPort, portConfig.removedPorts)) {
     return []; // Skip this VLAN if the port is being removed
   }
 
@@ -121,14 +160,18 @@ export async function convertConfig(input: string, portConfig: PortConfig = { po
       // Handle port set commands with port mapping
       if (trimmedLine.startsWith('port set port')) {
         let newLine = trimmedLine;
-        for (const mapping of portConfig.portMappings) {
-          // Update the port number after "port set port"
-          newLine = newLine.replace(
-            `port set port ${mapping.oldPort}`,
-            `port set port ${mapping.newPort}`
-          );
+        const portNumber = trimmedLine.split('port set port ')[1].split(' ')[0];
+
+        if (!isPortRemoved(portNumber, portConfig.removedPorts)) {
+          for (const mapping of portConfig.portMappings) {
+            // Update the port number after "port set port"
+            newLine = newLine.replace(
+              `port set port ${mapping.oldPort}`,
+              `port set port ${mapping.newPort}`
+            );
+          }
+          converted.push(newLine);
         }
-        converted.push(newLine);
         continue;
       }
 
@@ -139,7 +182,7 @@ export async function convertConfig(input: string, portConfig: PortConfig = { po
 
         vlanNumbers.forEach(vlan => {
           const vlanPorts = vlanPortMap.get(vlan) || new Set();
-          const hasNonRemovedPorts = Array.from(vlanPorts).some(port => !portConfig.removedPorts.includes(port));
+          const hasNonRemovedPorts = Array.from(vlanPorts).some(port => !isPortRemoved(port, portConfig.removedPorts));
 
           if (hasNonRemovedPorts || !vlanPorts.size) {
             converted.push(`virtual-switch create vs VLAN_${vlan}-VS`);
@@ -152,7 +195,7 @@ export async function convertConfig(input: string, portConfig: PortConfig = { po
         const parts = trimmedLine.split(' ');
         const vlanNum = parseInt(parts[3]);
         const vlanPorts = vlanPortMap.get(vlanNum) || new Set();
-        const hasNonRemovedPorts = Array.from(vlanPorts).some(port => !portConfig.removedPorts.includes(port));
+        const hasNonRemovedPorts = Array.from(vlanPorts).some(port => !isPortRemoved(port, portConfig.removedPorts));
 
         if (hasNonRemovedPorts) {
           const name = parts.slice(5).join('_');
