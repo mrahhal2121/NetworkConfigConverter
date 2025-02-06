@@ -8,16 +8,6 @@ export interface ConversionResult {
     originalVlans: number;
     virtualSwitches: number;
   };
-  mappings?: {
-    original: {
-      nodes: Node[];
-      edges: Edge[];
-    };
-    converted: {
-      nodes: Node[];
-      edges: Edge[];
-    };
-  };
 }
 
 interface PortConfig {
@@ -96,14 +86,6 @@ export async function convertConfig(input: string, portConfig: PortConfig = { po
     let originalVlanCount = 0;
     let virtualSwitchCount = 0;
 
-    // For visualization
-    const originalNodes: Node[] = [];
-    const originalEdges: Edge[] = [];
-    const convertedNodes: Node[] = [];
-    const convertedEdges: Edge[] = [];
-    let xPos = 50;
-    let yPos = 50;
-
     // Track which VLANs are associated with which ports
     const vlanPortMap = new Map<number, Set<string>>();
 
@@ -124,39 +106,6 @@ export async function convertConfig(input: string, portConfig: PortConfig = { po
         });
       }
     }
-
-    // Add VLANs to visualization
-    Array.from(vlanPortMap.keys()).forEach((vlan, index) => {
-      const vlanNodeId = `vlan-${vlan}`;
-      originalNodes.push({
-        id: vlanNodeId,
-        position: { x: xPos, y: yPos + index * 80 },
-        data: { label: `VLAN ${vlan}` }
-      });
-
-      // Connect VLANs to their ports
-      const ports = vlanPortMap.get(vlan) || new Set();
-      ports.forEach(port => {
-        if (!portConfig.removedPorts.includes(port)) {
-          const portNodeId = `port-${port}`;
-          // Add port node if it doesn't exist
-          if (!originalNodes.find(n => n.id === portNodeId)) {
-            originalNodes.push({
-              id: portNodeId,
-              position: { x: xPos + 300, y: yPos + index * 80 },
-              data: { label: `Port ${port}` }
-            });
-          }
-          // Add edge
-          originalEdges.push({
-            id: `${vlanNodeId}-${portNodeId}`,
-            source: vlanNodeId,
-            target: portNodeId,
-            animated: true
-          });
-        }
-      });
-    });
 
     // Second pass: convert configurations
     for (const line of lines) {
@@ -180,47 +129,13 @@ export async function convertConfig(input: string, portConfig: PortConfig = { po
         const vlanNumbers = parseVlanNumbers(vlanSpec);
         originalVlanCount += vlanNumbers.length;
 
-        vlanNumbers.forEach((vlan, index) => {
+        vlanNumbers.forEach(vlan => {
           const vlanPorts = vlanPortMap.get(vlan) || new Set();
           const hasNonRemovedPorts = Array.from(vlanPorts).some(port => !portConfig.removedPorts.includes(port));
 
           if (hasNonRemovedPorts || !vlanPorts.size) {
             converted.push(`virtual-switch create vs VLAN_${vlan}-VS`);
             virtualSwitchCount++;
-
-            // Add virtual switch to visualization
-            const vsNodeId = `vs-${vlan}`;
-            convertedNodes.push({
-              id: vsNodeId,
-              position: { x: xPos, y: yPos + index * 80 },
-              data: { label: `VS_${vlan}` }
-            });
-
-            // Connect to parent ports
-            vlanPorts.forEach(port => {
-              if (!portConfig.removedPorts.includes(port)) {
-                const mappedPort = portConfig.portMappings.find(m => m.oldPort === port)?.newPort || port;
-                const portNodeId = `parent-${mappedPort}`;
-
-                // Add parent port node if it doesn't exist
-                if (!convertedNodes.find(n => n.id === portNodeId)) {
-                  convertedNodes.push({
-                    id: portNodeId,
-                    position: { x: xPos + 300, y: yPos + index * 80 },
-                    data: { label: `Parent Port ${mappedPort}` }
-                  });
-                }
-
-                // Add edge to show parent port connection
-                convertedEdges.push({
-                  id: `${vsNodeId}-${portNodeId}`,
-                  source: vsNodeId,
-                  target: portNodeId,
-                  animated: true,
-                  label: 'parent-port'
-                });
-              }
-            });
           }
         });
       } else if (trimmedLine.startsWith('vlan add vlan')) {
@@ -257,16 +172,6 @@ export async function convertConfig(input: string, portConfig: PortConfig = { po
       stats: {
         originalVlans: originalVlanCount,
         virtualSwitches: virtualSwitchCount
-      },
-      mappings: {
-        original: {
-          nodes: originalNodes,
-          edges: originalEdges
-        },
-        converted: {
-          nodes: convertedNodes,
-          edges: convertedEdges
-        }
       }
     };
   } catch (error) {

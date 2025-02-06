@@ -10,7 +10,6 @@ import { Download, Upload, ArrowRight } from "lucide-react";
 import { convertConfig } from "@/lib/converter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { NetworkGraph } from "@/components/ui/network-graph";
 
 interface PortMapping {
   oldPort: string;
@@ -25,10 +24,6 @@ export default function Home() {
   const [portMappings, setPortMappings] = useState<PortMapping[]>([{ oldPort: "", newPort: "" }]);
   const [removedPorts, setRemovedPorts] = useState<string[]>([]);
   const [stats, setStats] = useState<{ originalVlans: number; virtualSwitches: number } | null>(null);
-  const [mappings, setMappings] = useState<{
-    original: { nodes: any[]; edges: any[] };
-    converted: { nodes: any[]; edges: any[] };
-  } | null>(null);
   const { toast } = useToast();
 
   const handleAddPortMapping = () => {
@@ -57,9 +52,6 @@ export default function Home() {
       }
       if (result.stats) {
         setStats(result.stats);
-      }
-      if (result.mappings) {
-        setMappings(result.mappings);
       }
       return result.config!;
     },
@@ -176,21 +168,6 @@ export default function Home() {
                     </div>
                   </CardContent>
                 </Card>
-              )}
-
-              {mappings && (
-                <div className="space-y-6">
-                  <NetworkGraph
-                    nodes={mappings.original.nodes}
-                    edges={mappings.original.edges}
-                    title="Original VLAN to Port Mappings"
-                  />
-                  <NetworkGraph
-                    nodes={mappings.converted.nodes}
-                    edges={mappings.converted.edges}
-                    title="Converted Virtual-Switch to Port Mappings"
-                  />
-                </div>
               )}
 
               <Textarea
