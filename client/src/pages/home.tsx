@@ -180,7 +180,7 @@ export default function Home() {
                     <CardTitle className="text-lg">Port Summary</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <pre className="whitespace-pre-wrap font-mono text-sm bg-muted p-4 rounded-lg">
+                    <pre className="whitespace-pre-wrap font-mono text-sm bg-muted p-4 rounded-lg overflow-x-auto">
                       {portSummary}
                     </pre>
                   </CardContent>

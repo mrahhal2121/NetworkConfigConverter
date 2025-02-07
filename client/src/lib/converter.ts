@@ -124,22 +124,27 @@ function convertInterfaceCommand(line: string, removedVlans: Set<number>): strin
   ];
 }
 
-function generatePortSummary(vlanPortMap: Map<number, Set<string>>, removedPorts: string[]): string {
+function generatePortSummary(vlanPortMap: Map<number, Set<string>>, portConfig: PortConfig): string {
   // Group VLANs by parent port
   const portToVlans = new Map<string, Set<number>>();
 
+  // Apply port mappings and collect VLANs
   for (const [vlan, ports] of vlanPortMap.entries()) {
-    for (const port of ports) {
-      if (!isPortRemoved(port, removedPorts)) {
-        if (!portToVlans.has(port)) {
-          portToVlans.set(port, new Set());
+    for (const originalPort of ports) {
+      if (!isPortRemoved(originalPort, portConfig.removedPorts)) {
+        // Apply port mapping if exists
+        const mapping = portConfig.portMappings.find(m => m.oldPort === originalPort);
+        const newPort = mapping ? mapping.newPort : originalPort;
+
+        if (!portToVlans.has(newPort)) {
+          portToVlans.set(newPort, new Set());
         }
-        portToVlans.get(port)!.add(vlan);
+        portToVlans.get(newPort)!.add(vlan);
       }
     }
   }
 
-  // Generate summary text
+  // Generate summary text with better formatting
   const summaryLines = Array.from(portToVlans.entries())
     .sort((a, b) => {
       // Sort ports numerically, handling both formats (e.g., "1.1" and "36")
@@ -153,10 +158,15 @@ function generatePortSummary(vlanPortMap: Map<number, Set<string>>, removedPorts
     })
     .map(([port, vlans]) => {
       const sortedVlans = Array.from(vlans).sort((a, b) => a - b);
-      return `Parent-Port ${port} = ${sortedVlans.join(',')}`;
+      return `Parent-Port ${port.padEnd(4)} = ${sortedVlans.join(', ')}`;
     });
 
-  return summaryLines.join('\n');
+  return [
+    'Port to Classifier-Precedence Mappings:',
+    '=====================================',
+    '',
+    ...summaryLines
+  ].join('\n');
 }
 
 export async function convertConfig(input: string, portConfig: PortConfig = { portMappings: [], removedPorts: [] }): Promise<ConversionResult> {
@@ -261,8 +271,8 @@ export async function convertConfig(input: string, portConfig: PortConfig = { po
       }
     }
 
-    // Add port summary to the result
-    const portSummary = generatePortSummary(vlanPortMap, portConfig.removedPorts);
+    // Generate port summary using the updated function
+    const portSummary = generatePortSummary(vlanPortMap, portConfig);
 
     return {
       success: true,
