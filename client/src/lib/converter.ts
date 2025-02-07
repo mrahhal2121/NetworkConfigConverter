@@ -8,6 +8,7 @@ export interface ConversionResult {
     originalVlans: number;
     virtualSwitches: number;
   };
+  portSummary?: string;
 }
 
 interface PortConfig {
@@ -53,7 +54,7 @@ function expandPortRange(portRange: string): string[] {
     for (let i = startInt; i <= endInt; i++) {
       ports.push(`${prefix}.${i}`);
     }
-  } 
+  }
   // Handle simple notation (e.g., "1-48")
   else {
     const startInt = parseInt(start);
@@ -121,6 +122,41 @@ function convertInterfaceCommand(line: string, removedVlans: Set<number>): strin
     `virtual-switch interface attach cpu-subinterface cpu-mpls-.${vlanNum} vs VLAN_${vlanNum}-VS`,
     `interface create ip-interface ${interfaceName} ip ${ipAddr} vs VLAN_${vlanNum}-VS`
   ];
+}
+
+function generatePortSummary(vlanPortMap: Map<number, Set<string>>, removedPorts: string[]): string {
+  // Group VLANs by parent port
+  const portToVlans = new Map<string, Set<number>>();
+
+  for (const [vlan, ports] of vlanPortMap.entries()) {
+    for (const port of ports) {
+      if (!isPortRemoved(port, removedPorts)) {
+        if (!portToVlans.has(port)) {
+          portToVlans.set(port, new Set());
+        }
+        portToVlans.get(port)!.add(vlan);
+      }
+    }
+  }
+
+  // Generate summary text
+  const summaryLines = Array.from(portToVlans.entries())
+    .sort((a, b) => {
+      // Sort ports numerically, handling both formats (e.g., "1.1" and "36")
+      const aNum = a[0].includes('.') ? 
+        parseInt(a[0].split('.')[0]) * 100 + parseInt(a[0].split('.')[1]) :
+        parseInt(a[0]);
+      const bNum = b[0].includes('.') ? 
+        parseInt(b[0].split('.')[0]) * 100 + parseInt(b[0].split('.')[1]) :
+        parseInt(b[0]);
+      return aNum - bNum;
+    })
+    .map(([port, vlans]) => {
+      const sortedVlans = Array.from(vlans).sort((a, b) => a - b);
+      return `Parent-Port ${port} = ${sortedVlans.join(',')}`;
+    });
+
+  return summaryLines.join('\n');
 }
 
 export async function convertConfig(input: string, portConfig: PortConfig = { portMappings: [], removedPorts: [] }): Promise<ConversionResult> {
@@ -225,13 +261,17 @@ export async function convertConfig(input: string, portConfig: PortConfig = { po
       }
     }
 
+    // Add port summary to the result
+    const portSummary = generatePortSummary(vlanPortMap, portConfig.removedPorts);
+
     return {
       success: true,
       config: converted.join('\n'),
       stats: {
         originalVlans: originalVlanCount,
         virtualSwitches: virtualSwitchCount
-      }
+      },
+      portSummary
     };
   } catch (error) {
     return {

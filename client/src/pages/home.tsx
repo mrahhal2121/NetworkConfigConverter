@@ -24,6 +24,7 @@ export default function Home() {
   const [portMappings, setPortMappings] = useState<PortMapping[]>([{ oldPort: "", newPort: "" }]);
   const [removedPorts, setRemovedPorts] = useState<string[]>([]);
   const [stats, setStats] = useState<{ originalVlans: number; virtualSwitches: number } | null>(null);
+  const [portSummary, setPortSummary] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleAddPortMapping = () => {
@@ -52,6 +53,9 @@ export default function Home() {
       }
       if (result.stats) {
         setStats(result.stats);
+      }
+      if (result.portSummary) {
+        setPortSummary(result.portSummary);
       }
       return result.config!;
     },
@@ -166,6 +170,19 @@ export default function Home() {
                         <div className="text-sm text-muted-foreground">Virtual Switches</div>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {portSummary && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Port Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <pre className="whitespace-pre-wrap font-mono text-sm bg-muted p-4 rounded-lg">
+                      {portSummary}
+                    </pre>
                   </CardContent>
                 </Card>
               )}
